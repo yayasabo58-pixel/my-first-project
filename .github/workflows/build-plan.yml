@@ -1,0 +1,53 @@
+name: Build Strategy Plan
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'generate_plan.py'
+      - '.github/workflows/build-plan.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install python-docx
+          sudo apt-get update
+          sudo apt-get install -y libreoffice-writer poppler-utils fonts-noto-cjk
+      - name: Generate document
+        run: python generate_plan.py
+      - name: Render and inspect
+        run: |
+          mkdir -p rendered
+          libreoffice --headless --convert-to pdf --outdir rendered output/*.docx
+          pdfinfo rendered/*.pdf | tee rendered/page_count.txt
+          PAGES=$(pdfinfo rendered/*.pdf | awk '/^Pages:/ {print $2}')
+          echo "Rendered pages: $PAGES"
+          if [ "$PAGES" -lt 120 ]; then
+            echo "Page count below 120" >&2
+            exit 1
+          fi
+      - name: Commit generated files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add output rendered
+          git commit -m 'Build 120+ page strategy plan [skip ci]' || true
+          git push
+      - uses: actions/upload-artifact@v4
+        with:
+          name: double-happiness-strategy-plan
+          path: |
+            output/*.docx
+            rendered/*.pdf
+            rendered/page_count.txt
