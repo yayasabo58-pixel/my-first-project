@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/runner/work/my-first-project/my-first-project/generate_plan.py", line 189, in <module>
+    r.bold = True; r.font.size = Pt(28); r._element.rPr.rFonts.set(qn('w:eastAsia'), '黑体')
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'set'
