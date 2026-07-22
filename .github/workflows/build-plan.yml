@@ -1,6 +1,8 @@
 name: Build Strategy Plan
 
 on:
+  pull_request:
+    branches: [ main ]
   push:
     branches: [ main ]
     paths:
@@ -41,6 +43,7 @@ jobs:
             exit 1
           fi
       - name: Commit generated files
+        if: github.event_name == 'push'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
