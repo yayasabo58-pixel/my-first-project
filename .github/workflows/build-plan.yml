@@ -5,14 +5,9 @@ on:
     branches: [ main ]
     paths:
       - 'generate_plan.py'
-      - 'augment_plan.py'
       - '.github/workflows/build-plan.yml'
   push:
     branches: [ main ]
-    paths:
-      - 'generate_plan.py'
-      - 'augment_plan.py'
-      - '.github/workflows/build-plan.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: build-plan-run
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -35,38 +32,12 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          for name in ('generate_plan.py','augment_plan.py'):
-              p=Path(name)
-              s=p.read_text(encoding='utf-8')
-              s=s.replace('._element.rPr.rFonts.set(', '._element.get_or_add_rPr().get_or_add_rFonts().set(')
-              p.write_text(s, encoding='utf-8')
+          p=Path('generate_plan.py')
+          s=p.read_text(encoding='utf-8').replace('._element.rPr.rFonts.set(', '._element.get_or_add_rPr().get_or_add_rFonts().set(')
+          p.write_text(s, encoding='utf-8')
           PY
-      - name: Generate base document
-        id: generate
-        shell: bash
-        run: |
-          set +e
-          python generate_plan.py > generate.log 2>&1
-          CODE=$?
-          cat generate.log
-          echo "exit_code=$CODE" >> "$GITHUB_OUTPUT"
-          exit 0
-      - name: Save diagnostics to branch
-        if: steps.generate.outputs.exit_code != '0'
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git fetch origin build-plan-run
-          git checkout build-plan-run
-          cp "$GITHUB_WORKSPACE/generate.log" ./generate-error.log
-          git add generate-error.log
-          git commit -m 'Save generator error log [skip ci]' || true
-          git push origin build-plan-run
-      - name: Fail when generation failed
-        if: steps.generate.outputs.exit_code != '0'
-        run: exit 1
-      - name: Augment document
-        run: python augment_plan.py
+      - name: Generate document
+        run: python generate_plan.py
       - name: Render and inspect
         run: |
           mkdir -p rendered
@@ -78,14 +49,13 @@ jobs:
             echo "Page count below 120" >&2
             exit 1
           fi
-      - name: Commit generated files
-        if: github.event_name == 'push'
+      - name: Commit generated files to branch
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add output rendered
           git commit -m 'Build 120+ page strategy plan [skip ci]' || true
-          git push
+          git push origin HEAD:build-plan-run
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -94,4 +64,3 @@ jobs:
             output/*.docx
             rendered/*.pdf
             rendered/page_count.txt
-            generate.log
