@@ -27,10 +27,10 @@ jobs:
           pip install python-docx
           sudo apt-get update
           sudo apt-get install -y libreoffice-writer poppler-utils fonts-noto-cjk
-      - name: Generate and augment document
-        run: |
-          python generate_plan.py
-          python augment_plan.py
+      - name: Generate base document
+        run: python generate_plan.py
+      - name: Augment document
+        run: python augment_plan.py
       - name: Render and inspect
         run: |
           mkdir -p rendered
@@ -51,6 +51,7 @@ jobs:
           git commit -m 'Build 120+ page strategy plan [skip ci]' || true
           git push
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: double-happiness-strategy-plan
           path: |
