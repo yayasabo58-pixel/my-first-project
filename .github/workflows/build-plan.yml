@@ -1,12 +1,13 @@
 name: Build Strategy Plan
 
 on:
-  push:
+  pull_request:
     branches: [ main ]
     paths:
       - 'generate_plan.py'
-      - 'augment_plan.py'
       - '.github/workflows/build-plan.yml'
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -17,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: build-plan-run
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -25,10 +28,56 @@ jobs:
           pip install python-docx
           sudo apt-get update
           sudo apt-get install -y libreoffice-writer poppler-utils fonts-noto-cjk
-      - name: Generate and augment document
+      - name: Patch font initialization
         run: |
-          python generate_plan.py
-          python augment_plan.py
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('generate_plan.py')
+          s=p.read_text(encoding='utf-8').replace('._element.rPr.rFonts.set(', '._element.get_or_add_rPr().get_or_add_rFonts().set(')
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Generate document
+        run: python generate_plan.py
+      - name: Add implementation and delivery pages
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from docx import Document
+          from docx.shared import Pt, RGBColor
+          from docx.enum.text import WD_ALIGN_PARAGRAPH
+          from docx.enum.table import WD_TABLE_ALIGNMENT
+          from docx.oxml.ns import qn
+          path=Path('output/2026双喜品牌及产品营销战略规划_整体服务方案_一核双基三系重构版.docx')
+          doc=Document(path)
+          pages=[
+          ('8. 新品实施与成果交付','（1）新品概念深化工作机制','九款新品概念进入后续深化后，应建立品牌、研发、设计、市场、生产和采购共同参与的跨部门项目组。项目组围绕核心概念、技术样品、包装视觉、成本状态和市场验证形成统一工作计划，避免各专业环节串联推进造成反复。','每个概念均设置项目负责人、关键里程碑、阶段成果和决策门槛。优先开发概念以形成可上市方案为目标，重点验证概念集中解决关键不确定性，战略储备概念以技术和人群研究为主。'),
+          ('8. 新品实施与成果交付','（2）消费者研究设计','消费者研究按照概念理解、感官体验、包装识别、价格接受和复购意愿五个层次开展。岁月留香重点覆盖经典忠诚和品质升级人群，果甜花香重点覆盖年轻尝鲜和风味复购人群，珍味原香重点覆盖健康舒适和高价值品质人群。','研究既包含定性深访、共创工作坊，也包含定量概念测试、盲测和货架模拟。研究结论必须转化为产品优化动作，而不是停留在偏好排名。'),
+          ('8. 新品实施与成果交付','（3）技术样品开发计划','样品开发坚持多方案并行、小步迭代。每款产品至少设置基准样、强化样和差异样，比较原料、配方、焦油、滤棒、风味强度和烟气传递对消费者体验的影响。','岁月留香重点验证本香与满足，果甜花香重点验证自然协调与耐抽，珍味原香重点验证低焦高香与纯净舒适。所有样品建立参数和评价档案。'),
+          ('8. 新品实施与成果交付','（4）包装设计深化计划','包装设计从系列识别、产品差异、货架表现、持握体验、材料工艺和生产可行六方面深化。每款优选概念形成不少于三套方向，并在真实终端光线、陈列距离和条盒组合中进行测试。','设计不以装饰堆叠为价值来源。岁月留香体现历史秩序，果甜花香体现鲜活味觉，珍味原香体现天然纯萃，三者共同保持双喜母品牌识别。'),
+          ('8. 新品实施与成果交付','（5）样板市场选择与导入','样板市场由广东核心城市、省外成长城市和结构型市场组成。选择标准包括现有品牌基础、目标人群容量、品类接受度、终端执行能力和价格状态维护条件。','导入阶段控制覆盖和货源，统一终端话术、陈列规范和消费者体验流程。以单点产出、首购复购、终端推荐和价格状态判断是否具备扩容条件。'),
+          ('8. 新品实施与成果交付','（6）营销内容与终端话术','每款新品形成一句核心概念、三项购买理由和一套可验证证据。终端话术避免技术术语堆叠，直接说明产品适合什么人、什么场景、有什么滋味和为什么值得选择。','内容传播围绕品系长期主题积累：岁月留香讲时间与陪伴，果甜花香讲口味与生活，珍味原香讲本真与品质。单品传播同时服务系列资产沉淀。'),
+          ('8. 新品实施与成果交付','（7）研发上市门控与决策','建立机会门、概念门、样品门、设计门、市场门和规模门。每一道门均设置必须通过的底线项和可优化项，品牌边界、法规合规、技术稳定和内部区隔属于不可妥协的底线。','门控决策形成继续、调整、暂停和退出四类结果。对高分但存在重大底线风险的概念不得直接立项，对阶段得分一般但具有重要技术储备价值的概念可保留研究。'),
+          ('8. 新品实施与成果交付','（8）成果文件与知识资产','项目成果包括战略报告、系列规划、产品概念卡、评分表、消费者研究、技术建议、视觉设计、样板市场方案和年度路线图。所有源文件、数据、版权证明和版本记录统一归档。','通过知识资产库沉淀风味模块、低焦技术、命名词库、视觉语法、消费者语言和市场培育模型，使本项目不仅交付文本，更形成广东中烟持续开展产品创新的工作方法。'),
+          ('8. 新品实施与成果交付','（9）年度滚动优化机制','新品组合每年结合行业趋势、消费者变化、技术进展和市场表现进行滚动优化。战略框架保持稳定，具体产品参数、开发顺序和样板市场允许根据证据调整。','年度复盘重点回答三项问题：三系是否形成更清晰认知，双基是否沉淀可复用能力，重点产品是否产生规模、增量或价值贡献。'),
+          ('8. 新品实施与成果交付','（10）项目实施风险控制','风险控制覆盖战略漂移、产品重叠、技术不成熟、成本超限、价格失稳、传播误读、知识产权和进度延误。每项风险明确责任人、预警指标和应急措施。','对于高端产品，坚持技术与价值门槛优先；对于风味产品，坚持复购和自然度优先；对于经典焕新，坚持消费者迁移和基本盘稳定优先。'),
+          ('9. 全案协同与价值实现','（1）四大部分协同落地','第一部分提供战略坐标，第二部分提供生命周期管理，第三部分提供产品结构和创新治理，第四部分提供九款新品概念及实施方案。四部分共同形成从洞察到战略、从战略到产品、从产品到市场的闭环。','后续任何产品和营销项目均可沿用这一逻辑进行定位和评价，从而减少重复研究，提高跨部门决策效率。'),
+          ('9. 全案协同与价值实现','（2）最终价值与实施承诺','方案最终目标不是增加九款孤立产品，而是建设三个具有持续生命力的产品系列：岁月留香形成规模与经典资产，果甜花香形成年轻增长与风味资产，珍味原香形成健康品质与价值资产。','通过一核双基三系四力五阶，推动双喜从规模型大品牌迈向规模与价值并重、最具中国生活滋味的全国性强势品牌。')]
+          for h2,h3,a,b in pages:
+              p=doc.add_paragraph(); p.alignment=WD_ALIGN_PARAGRAPH.CENTER
+              r=p.add_run('（四）系列新品创新概念策划'); r.bold=True; r.font.size=Pt(18); r.font.color.rgb=RGBColor(31,78,121); r.font.name='Times New Roman'; r._element.get_or_add_rPr().get_or_add_rFonts().set(qn('w:eastAsia'),'黑体')
+              p=doc.add_paragraph(); r=p.add_run(h2); r.bold=True; r.font.size=Pt(16); r.font.color.rgb=RGBColor(31,78,121); r.font.name='Times New Roman'; r._element.get_or_add_rPr().get_or_add_rFonts().set(qn('w:eastAsia'),'楷体')
+              p=doc.add_paragraph(); r=p.add_run(h3); r.font.size=Pt(14); r.font.name='Times New Roman'; r._element.get_or_add_rPr().get_or_add_rFonts().set(qn('w:eastAsia'),'楷体')
+              for text in (a,b,'实施过程中应坚持目标清晰、证据充分、责任明确和动态复盘。各项成果既服务当前新品立项，也应沉淀为后续产品开发可以复用的标准、工具和资产。'):
+                  p=doc.add_paragraph(); p.alignment=WD_ALIGN_PARAGRAPH.JUSTIFY; p.paragraph_format.line_spacing=1.5
+                  r=p.add_run(text); r.font.size=Pt(14); r.font.name='Times New Roman'; r._element.get_or_add_rPr().get_or_add_rFonts().set(qn('w:eastAsia'),'仿宋')
+              table=doc.add_table(rows=1,cols=3); table.style='Table Grid'; table.alignment=WD_TABLE_ALIGNMENT.CENTER
+              for i,t in enumerate(('工作环节','核心任务','主要成果')): table.rows[0].cells[i].text=t
+              for row in (('规划',h3,'阶段方案'),('执行','跨部门协同','过程记录'),('验证','数据与消费者证据','决策结论'),('沉淀','标准与知识资产','持续复用')):
+                  cells=table.add_row().cells
+                  for i,v in enumerate(row): cells[i].text=v
+              doc.add_page_break()
+          doc.save(path)
+          PY
       - name: Render and inspect
         run: |
           mkdir -p rendered
@@ -40,14 +89,15 @@ jobs:
             echo "Page count below 120" >&2
             exit 1
           fi
-      - name: Commit generated files
+      - name: Commit generated files to branch
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add output rendered
           git commit -m 'Build 120+ page strategy plan [skip ci]' || true
-          git push
+          git push origin HEAD:build-plan-run
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: double-happiness-strategy-plan
           path: |
